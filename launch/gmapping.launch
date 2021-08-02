@@ -1,0 +1,11 @@
+<launch>
+
+	<node pkg="stage_ros" type="stageros" name="stageros" args="$(find stage_tutorial)/worlds/rooms.world" />
+
+	<node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop_twist_keyboard" output="screen"/>
+
+	<node pkg="gmapping" type="slam_gmapping" name="gmapping" output="screen">
+		<remap from="/scan" to="/base_scan_0"/>
+	</node>
+
+</launch>
