@@ -5,14 +5,14 @@ define rob5_laser ranger
 		fov 360.
 		samples 360
 	)
-	pose [ 0.215 0.000 1. 0. ]
+	pose [ 0.215 0.000 0. 0. ]
 	size [ 0.01 0.01 0.01 ]
 )
 
 define rob5 position
 (
 	# basic attributes of the robot
-	size [1. 1. 1.]
+	size [1. 1. 0.5]
 	origin [0. 0. 0. 0.]
 	color "honeydew2"
 	drive "diff"
