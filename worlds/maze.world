@@ -26,5 +26,5 @@ floorplan (
    bitmap "../maps/maze.png"
 )
 
-include "../robots/robot_group5.inc"
-rob5 (pose [11.1 9.2 0.0 90.0] name "robot")
+include "../robots/simple_robot.inc"
+simple_robot (pose [ 2.0  1.0  0.000  90.000 ] name "robot")
