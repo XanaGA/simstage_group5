@@ -27,4 +27,4 @@ floorplan (
 )
 
 include "../robots/simple_robot.inc"
-simple_robot (pose [ 11.1  9.2  0.000  90.000 ] name "robot")
+simple_robot (pose [ 2.0  1.0  0.000  90.000 ] name "robot")
