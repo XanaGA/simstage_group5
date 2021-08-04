@@ -1,10 +1,12 @@
 define rob5_laser ranger
 (
 	sensor(
-		range_max 1.
-		fov 360
+		range [0.0 2.0]
+		fov 360.
 		samples 360
 	)
+	pose [ 0.215 0.000 1. 0. ]
+	size [ 0.01 0.01 0.01 ]
 )
 
 define rob5 position
@@ -13,6 +15,7 @@ define rob5 position
 	size [1. 1. 1.]
 	origin [0. 0. 0. 0.]
 	color "honeydew2"
+	drive "diff"
 
 	# shape of the robot
 	block
@@ -41,8 +44,8 @@ define rob5 position
 	(
 		points 4
 		point[0] [ 0.225 0.000 ]
-		point[1] [ -0.086 0.208 ]
-		point[2] [ -0.076 0.198 ]
+		point[1] [ -0.159 0.159 ]
+		point[2] [ -0.139 0.149 ]
 		point[3] [ 0.215 0.000 ]
 		z [0.5 1.]
 	)
@@ -51,8 +54,8 @@ define rob5 position
 	(
 		points 4
 		point[0] [ 0.225 0.000 ]
-		point[1] [ -0.086 -0.208 ]
-		point[2] [ -0.076 -0.198 ]
+		point[1] [ -0.159 -0.159 ]
+		point[2] [ -0.139 -0.149 ]
 		point[3] [ 0.215 0.000 ]
 		z [0.5 1.]
 	)
@@ -60,10 +63,10 @@ define rob5 position
 	block
 	(
 		points 4
-		point[0] [ -0.086 -0.208 ]
-		point[1] [ -0.086 0.208 ]
-		point[2] [ -0.076 0.198 ]
-		point[3] [ -0.076 -0.198 ]
+		point[0] [ -0.159 -0.159 ]
+		point[1] [ -0.139 -0.149 ]
+		point[2] [ -0.139 0.149 ]
+		point[3] [ -0.159 0.159 ]
 		z [0.5 1.]
 	)
 
@@ -71,11 +74,11 @@ define rob5 position
 	gui_nose 0
 	gui_grid 0
 	gui_outline 1
-	gui_move 1 (1 if the model has no parents);
+	gui_move 1
 
 	# locallization properties
 	localization "odom"
 	odom_error [ 0.01 0.01 0.0 0.05 ]
 
-	rob5_laser(pose [ 0.225 0.000 0.])
+	rob5_laser()
 )
