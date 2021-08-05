@@ -18,16 +18,21 @@ class Robot{
   protected:
     // Declare the nested class Option
     class Option{
-      protected:
-        //Declare the variables for the pose and orientation
+      public:
+        // Declare the variables for the pose and orientation
         float x, y, yaw;
 
-        //Declare the action of that pose
-        std::string action;
+        // Declare the variable for the orientation as quaternion
+        tf::Quaternion ori; 
+
+        // Declare the action of that pose:
+        // RIGHT  LEFT  FRONT BACK 
+        // -90     90     0    180
+        float action;
     };
 
-    // Declare a stack to store the options
-    std::stack<Option> opt_stack;
+    // Declare a stack (inplemented as a vector) to store the options
+    std::stack<Option, std::vector<Option> > opt_stack;
 
     // Declare Node Handler
     ros::NodeHandle n;
@@ -40,7 +45,7 @@ class Robot{
     ros::Publisher cmd_vel_pub; 
 
     // Declare the variables to store the current pose
-    float curr_x, curr_y;
+    float curr_x, curr_y, curr_yaw;
     tf::Quaternion curr_ori;
 
     // Declare the variables for the distance
@@ -54,7 +59,7 @@ class Robot{
     std::array<int, 3> new_st;
 
     // Declare a threshold
-    float thresh = 0.5;
+    float thresh = 0.21;
 
     // Create a message for moving forward
     geometry_msgs::Twist move_front;
@@ -62,7 +67,7 @@ class Robot{
 
     
   public:
-
+    // CALLBACKS
     void laserCallback(const sensor_msgs::LaserScan::ConstPtr& msg){
       float dist_left = *std::min_element (msg->ranges.begin()+45, msg->ranges.begin()+135);
       float dist_front = *std::min_element (msg->ranges.begin()+136, msg->ranges.begin()+225);
@@ -78,9 +83,65 @@ class Robot{
       z = odometry_msg->pose.pose.orientation.z;
       w = odometry_msg->pose.pose.orientation.w;
 
-      curr_ori = tf::Quaternion(x,y,z,w); 
+      // tf::Quaternion q = tf::Quaternion(x,y,z,w);
+      // tf::Quaternion r = tf::Quaternion(x,y,z,w);
+      // tf::Quaternion p = q*r;
+
+      static double siny_cosp, cosy_cosp;
+      siny_cosp = 2 * (w * z + x * y);
+      cosy_cosp = 1 - 2 * (y * y + z * z);
+      curr_yaw = atan2(siny_cosp, cosy_cosp);
     }
 
+    // BASIC OPERATIONS
+
+    void rotate_angle(float angle_to_rotate){
+      // Message to be published
+      static auto msg = geometry_msgs::Twist();
+
+      // Calculate the target angle
+      float t_angle;
+      t_angle = fmod(curr_yaw + angle_to_rotate, 360.);
+
+      while(abs(curr_yaw - t_angle) > 0.1){
+        msg.linear.x = 0.;
+        // The direction will be 1 for turning left & -1 for turning right
+        msg.angular.z = abs(angle_to_rotate)/angle_to_rotate * 0.5;
+        this->cmd_vel_pub.publish(msg);
+        ros::spinOnce();
+      }
+    }
+
+    void rotate_target(float target){
+      // Message to be published
+      auto msg = geometry_msgs::Twist();
+
+      // Calculate the direction
+      float difference = target - curr_yaw;
+      
+      int direction = abs(difference) < 180;
+
+      while(abs(curr_yaw - target) > 0.1){
+        msg.linear.x = 0.;
+        // The direction will be 1 for turning left & -1 for turning right
+        msg.angular.z = direction * 0.5;
+        this->cmd_vel_pub.publish(msg);
+        ros::spinOnce();
+      }
+    }
+
+    void move_to_target(float target_x, float target_y ){
+        // Message to be published
+        auto msg = geometry_msgs::Twist();
+        while(sqrt(pow((target_x - curr_x), 2) + pow((target_y - curr_y), 2)) > 0.5){
+            msg.linear.x = 0.5;
+            msg.angular.z = 0.;
+            this->cmd_vel_pub.publish(msg);
+            ros::spinOnce();
+        }
+    }
+
+    // CONSTRUCTOR
     Robot(){
       // Initialize the Node Handler
       n = ros::NodeHandle();
@@ -97,49 +158,40 @@ class Robot{
       move_front.angular.z = 0.0;
     }
 
+    // CLASS METHODS
     void curr_state_init(){
-      if(dist_left <= thresh){
-        curr_st[0] = 1;
-      }else{
-        curr_st[0] = 0;
-      }
 
-      if(dist_right <= thresh){
-        curr_st[1] = 1;
-      }else{
-        curr_st[1] = 0;
-      }
+      update_st_array(curr_st);
 
-      if(dist_front <= thresh){
-        curr_st[2] = 1;
-      }else{
-        curr_st[1] = 0;
-      }
     }
 
-    void move(){
-      // Publish the message for moving forward
-      cmd_vel_pub.publish(move_front);
-
-      do{
-
-        if(dist_left <= thresh){
-          new_st[0] = 1;
+    void update_st_array(std::array<int, 3> arr){
+      if(dist_left <= thresh){
+          arr[0] = 1;
         }else{
-          new_st[0] = 0;
+          arr[0] = 0;
         }
 
         if(dist_right <= thresh){
-          new_st[1] = 1;
+          arr[1] = 1;
         }else{
-          new_st[1] = 0;
+          arr[1] = 0;
         }
 
         if(dist_front <= thresh){
-          new_st[2] = 1;
+          arr[2] = 1;
         }else{
-          new_st[1] = 0;
+          arr[1] = 0;
         }
+    }
+
+    void move(){
+      
+      do{
+        // Publish the message for moving forward
+        cmd_vel_pub.publish(move_front);
+
+        update_st_array(new_st);
 
         ros::spinOnce();
 
@@ -148,24 +200,134 @@ class Robot{
       curr_st = new_st;
     }
 
-    void evaluate_options(){
+    bool evaluate_options(){
       // Updates the stack with new options depending on the curr_st
+      // Returns True if new options (different from going BACK) are added, False if not
+      bool res = false;
+
+      if(!opt_stack.empty()){
+        Robot::Option back;
+        back.x = curr_x;
+        back.y = curr_y;
+        back.yaw = curr_yaw;
+        back.action = 180;
+
+        opt_stack.push(back);
+      }
+
+      if(!new_st[0]){
+        Robot::Option left;
+        left.x = curr_x;
+        left.y = curr_y;
+        left.yaw = curr_yaw;
+        left.action = -90;
+
+        opt_stack.push(left);
+
+        res = true;
+      }
+
+      if(!new_st[1]){
+        Robot::Option front;
+        front.x = curr_x;
+        front.y = curr_y;
+        front.yaw = curr_yaw;
+        front.action = 0;
+
+        opt_stack.push(front);
+
+        res = true;
+      }
+
+      if(!new_st[2]){
+        Robot::Option right;
+        right.x = curr_x;
+        right.y = curr_y;
+        right.yaw = curr_yaw;
+        right.action = 90;
+
+        opt_stack.push(right);
+
+        res = true;
+      }
+
+      return res;
     }
 
     void m_decition(){
+      // We have to distinguish between the case where the option is a new one 
+      //or it is revisited 
 
-      evaluate_options();
-
-      if(!opt_stack.empty()){
-        // Retrieve the first option of the stack
-        //Option opt = *opt_stack.top();
+      if(evaluate_options()){
+        Robot::Option opt = opt_stack.top();
         opt_stack.pop();
-        
-        // Calculations for modifiying the angle
 
-        // Angular velocity positive or negative depending on the calculations
-      }else{
+        rotate_angle(opt.action);
+
+        curr_st = new_st;
+
+      }
+      else if(!opt_stack.empty()){
+        // Retrieve the top option of the stack
+        Robot::Option opt = opt_stack.top();
+        opt_stack.pop();
+
+        // Turn back, as in this case we always be returning to a visited node
+        rotate_angle(opt.action);
+
+        // Retrieve the next top option
+        opt = opt_stack.top();
+        opt_stack.pop();
+
+        // Move to the previous node
+        move_to_target(opt.x,opt.y);
+        
+        // Boolean to know if we have arrived at the end of the maze (if the queue is empty)
+        bool keep_exploring;
+        keep_exploring = 1;
+
+        float target_angle;
+
+        // While the option retrieved is going back, don't "explore"
+        while(opt.action = 180){
+          
+          // Calculate the angle to rotate
+          target_angle = fmod(opt.yaw + opt.action,360.);
+          
+          rotate_target(target_angle);
+
+          // Move to the previous node
+          move_to_target(opt.x,opt.y);
+
+          if(!opt_stack.empty()){
+            opt = opt_stack.top();
+            opt_stack.pop();
+          }else{
+            keep_exploring=0;
+            break;
+          }
+
+          ros::spinOnce();
+        }
+
+        if(keep_exploring){
+          // Rotate and continue "exploring"
+          target_angle = fmod(opt.yaw + opt.action, 360.);
+          
+          rotate_target(target_angle);
+
+          update_st_array(new_st);
+          curr_st = new_st;
+
+        }else{
+          ROS_INFO("You are done!");
+          ros::shutdown();
+        }
+        
+      }
+      else{
         ROS_INFO("You are done!");
+        ros::shutdown();
       }
     }
 
@@ -194,11 +356,15 @@ class Robot{
 
 
 int main(int argc, char **argv){
+  
   // Initialize ROS
   ros::init(argc, argv, "reactive_navigation"); 
 
   // Create the robot object 
   Robot robot;
+
+  // // TESTING
+  // robot.m_decition();
 
   // Run it
   robot.run();
