@@ -1,7 +1,7 @@
 define rob5_laser ranger
 (
 	sensor(
-		range [0.0 2.0]
+		range [0.0 3.0]
 		fov 360.
 		samples 360
 	)

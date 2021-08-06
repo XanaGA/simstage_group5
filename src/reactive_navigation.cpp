@@ -60,7 +60,7 @@ protected:
 	int new_st[3];
 
 	// Declare a threshold
-	float thresh = 1.9;
+	float thresh = 2.0;
 
 	// Create a message for moving forward
 	geometry_msgs::Twist move_front;
@@ -69,9 +69,12 @@ public:
 	// CALLBACKS
 	void laserCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 	{
-		dist_right = *std::min_element(msg->ranges.begin() + 45, msg->ranges.begin() + 135);
-		dist_front = *std::min_element(msg->ranges.begin() + 136, msg->ranges.begin() + 225);
-		dist_left = *std::min_element(msg->ranges.begin() + 226, msg->ranges.begin() + 315);
+		dist_right = *std::min_element(msg->ranges.begin() + 60, msg->ranges.begin() + 120);
+		dist_front = *std::min_element(msg->ranges.begin() + 150, msg->ranges.begin() + 210);
+		dist_left = *std::min_element(msg->ranges.begin() + 240, msg->ranges.begin() + 300);
+		// ROS_INFO("R dist: %f", dist_right);
+		// ROS_INFO("F dist: %f", dist_front);
+		// ROS_INFO("L dist: %f", dist_left);
 	}
 
 	void odomCallback(const nav_msgs::Odometry::ConstPtr &odometry_msg)
@@ -85,13 +88,15 @@ public:
 		w = odometry_msg->pose.pose.orientation.w;
 
 		// tf::Quaternion q = tf::Quaternion(x,y,z,w);
-		// tf::Quaternion r = tf::Quaternion(x,y,z,w);
-		// tf::Quaternion p = q*r;
+		// curr_yaw = q.getAngle();
+		// curr_yaw = curr_yaw * (180.0/3.141592653589793238463);
 
 		static double siny_cosp, cosy_cosp;
 		siny_cosp = 2 * (w * z + x * y);
 		cosy_cosp = 1 - 2 * (y * y + z * z);
 		curr_yaw = atan2(siny_cosp, cosy_cosp);
+		curr_yaw = curr_yaw * (180.0/3.141592653589793238463);
+		curr_yaw = (curr_yaw < 0) ? 360.0+curr_yaw : curr_yaw;
 	}
 
 	// BASIC OPERATIONS
@@ -104,14 +109,19 @@ public:
 		// Calculate the target angle
 		float t_angle;
 		t_angle = fmod(curr_yaw + angle_to_rotate, 360.);
+		t_angle = (t_angle < 0) ? t_angle+360 : t_angle;
 
-		while (abs(curr_yaw - t_angle) > 0.1)
+		ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, t_angle);
+		ros::Rate loop_rate(10);
+		while (abs(curr_yaw - t_angle) > 5)
 		{
+			ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, t_angle);
 			msg.linear.x = 0.;
 			// The direction will be 1 for turning left & -1 for turning right
 			msg.angular.z = abs(angle_to_rotate) / angle_to_rotate * 0.5;
 			this->cmd_vel_pub.publish(msg);
 			ros::spinOnce();
+			loop_rate.sleep();
 		}
 	}
 
@@ -125,8 +135,9 @@ public:
 
 		int direction = abs(difference) < 180;
 
-		while (abs(curr_yaw - target) > 0.1)
+		while (abs(curr_yaw - target) > 5)
 		{
+			ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, target);
 			msg.linear.x = 0.;
 			// The direction will be 1 for turning left & -1 for turning right
 			msg.angular.z = direction * 0.5;
@@ -139,7 +150,7 @@ public:
 	{
 		// Message to be published
 		auto msg = geometry_msgs::Twist();
-		while (sqrt(pow((target_x - curr_x), 2) + pow((target_y - curr_y), 2)) > 0.5)
+		while (sqrt(pow((target_x - curr_x), 2) + pow((target_y - curr_y), 2)) > 1)
 		{
 			msg.linear.x = 0.5;
 			msg.angular.z = 0.;
@@ -155,29 +166,35 @@ public:
 		n = ros::NodeHandle();
 
 		// Suscribe to the laser and odometry topics
-		laser_sub = n.subscribe("/base_scan", 1, &Robot::laserCallback, this);
-		odom_sub = n.subscribe("/odom", 1, &Robot::odomCallback, this);
+		laser_sub = n.subscribe("/base_scan", 10, &Robot::laserCallback, this);
+		odom_sub = n.subscribe("/odom", 10, &Robot::odomCallback, this);
 
 		// Set the subscriber to /cmd_vel
 		cmd_vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 
 		// Fill the front message
-		move_front.linear.x = 0.5;
+		move_front.linear.x = 1.0;
 		move_front.angular.z = 0.0;
+
+		// Allow callbacks to initialize the pose
+		ros::spinOnce();
+
+		curr_yaw=0;
 	}
 
 	// CLASS METHODS
-	void curr_state_init()
+	void state_init()
 	{
 		update_st_array(curr_st);
 		ROS_INFO("Current init: %d, %d, %d", curr_st[0], curr_st[1], curr_st[2]);
+		std::copy(std::begin(curr_st), std::end(curr_st), std::begin(new_st));
 	}
 
 	void update_st_array(int* arrptr)
 	{
 		arrptr[0] = (dist_left <= thresh) ? 1 : 0;
-		arrptr[1] = (dist_right <= thresh) ? 1 : 0;
-		arrptr[2] = (dist_front <= thresh) ? 1 : 0;
+		arrptr[1] = (dist_front <= thresh) ? 1 : 0;
+		arrptr[2] = (dist_right <= thresh) ? 1 : 0;
 	}
 
 	void move()
@@ -228,7 +245,7 @@ public:
 			left.x = curr_x;
 			left.y = curr_y;
 			left.yaw = curr_yaw;
-			left.action = -90;
+			left.action = 90;
 
 			opt_stack.push(left);
 
@@ -254,7 +271,7 @@ public:
 			right.x = curr_x;
 			right.y = curr_y;
 			right.yaw = curr_yaw;
-			right.action = 90;
+			right.action = -90;
 
 			opt_stack.push(right);
 
@@ -271,16 +288,20 @@ public:
 
 		if (evaluate_options())
 		{
+			ROS_INFO("Going F/L/R");
+
 			Robot::Option opt = opt_stack.top();
 			opt_stack.pop();
 
+			ROS_INFO("Before rotating %f degrees", opt.action);
 			rotate_angle(opt.action);
 
-			// std::copy(std::begin(new_st), std::end(new_st), std::begin(curr_st));
-			// TODO: commented out because it right now nullifies the initialized curr_st
+			update_st_array(new_st);
+			std::copy(std::begin(new_st), std::end(new_st), std::begin(curr_st));
 		}
 		else if (!opt_stack.empty())
 		{
+			ROS_INFO("Going Back");
 			// Retrieve the top option of the stack
 			Robot::Option opt = opt_stack.top();
 			opt_stack.pop();
@@ -302,7 +323,7 @@ public:
 			float target_angle;
 
 			// While the option retrieved is going back, don't "explore"
-			while (opt.action = 180)
+			while (opt.action == 180)
 			{
 
 				// Calculate the angle to rotate
@@ -357,14 +378,14 @@ public:
 		ros::spinOnce();
 
 		// Initialize the current state
-		curr_state_init();
+		state_init();
 
 		while (ros::ok())
 		{
 			// Make a decition
-			ROS_INFO("Before m_detection");
+			ROS_INFO("Before decition");
 			m_decition();
-			ROS_INFO("After m_detection");
+			ROS_INFO("After decition");
 
 			// Move to the front until the state changes
 			ROS_INFO("Before move");
@@ -383,12 +404,13 @@ int main(int argc, char **argv)
 	// Initialize ROS
 	ros::init(argc, argv, "reactive_navigation");
 
+	// Create a node handler and use it for the delay
+	ros::NodeHandle nh;
+	ros::Duration(3.).sleep();
+
 	// Create the robot object
 	Robot robot;
-
-	// // TESTING
-	// robot.m_decition();
-
+	
 	// Run it
 	robot.run();
 
