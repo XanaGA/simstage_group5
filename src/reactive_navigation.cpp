@@ -329,9 +329,10 @@ public:
 			// While the option retrieved is going back, don't "explore"
 			while (opt.action == 180)
 			{
-
+				ROS_INFO("Keep going back");
 				// Calculate the angle to rotate
 				target_angle = fmod(opt.yaw + opt.action, 360.);
+				target_angle = (target_angle < 0) ? target_angle+360 : target_angle;
 
 				rotate_target(target_angle);
 
@@ -354,6 +355,7 @@ public:
 
 			if (keep_exploring)
 			{
+				ROS_INFO("New option");
 				// Rotate and continue "exploring"
 				target_angle = fmod(opt.yaw + opt.action, 360.);
 				target_angle = (target_angle < 0) ? target_angle+360 : target_angle;
