@@ -115,7 +115,7 @@ public:
 		ros::Rate loop_rate(10);
 		while (abs(curr_yaw - t_angle) > 5)
 		{
-			ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, t_angle);
+			//ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, t_angle);
 			msg.linear.x = 0.;
 			// The direction will be 1 for turning left & -1 for turning right
 			msg.angular.z = abs(angle_to_rotate) / angle_to_rotate * 0.5;
@@ -135,9 +135,10 @@ public:
 
 		int direction = abs(difference) < 180;
 
+		ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, target);
 		while (abs(curr_yaw - target) > 5)
 		{
-			ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, target);
+			//ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, target);
 			msg.linear.x = 0.;
 			// The direction will be 1 for turning left & -1 for turning right
 			msg.angular.z = direction * 0.5;
@@ -301,7 +302,7 @@ public:
 		}
 		else if (!opt_stack.empty())
 		{
-			ROS_INFO("Going Back");
+			ROS_ERROR("Going Back");
 			// Retrieve the top option of the stack
 			Robot::Option opt = opt_stack.top();
 			opt_stack.pop();
@@ -313,8 +314,11 @@ public:
 			opt = opt_stack.top();
 			opt_stack.pop();
 
+			ROS_INFO("GOAL LOCATION: %f, %f",opt.x, opt.y );
+
 			// Move to the previous node
 			move_to_target(opt.x, opt.y);
+			ROS_ERROR("REACHED!!!");
 
 			// Boolean to know if we have arrived at the end of the maze (if the queue is empty)
 			bool keep_exploring;
@@ -352,6 +356,7 @@ public:
 			{
 				// Rotate and continue "exploring"
 				target_angle = fmod(opt.yaw + opt.action, 360.);
+				target_angle = (target_angle < 0) ? target_angle+360 : target_angle;
 
 				rotate_target(target_angle);
 

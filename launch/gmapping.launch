@@ -3,7 +3,7 @@
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find simstage_group5)/configuration/config_file.rviz" />
 
 	<node pkg="gmapping" type="slam_gmapping" name="gmapping" output="screen">
-		<remap from="/scan" to="/base_scan_0"/>
+		<remap from="/scan" to="/base_scan"/>
 	</node>
 
 </launch>
