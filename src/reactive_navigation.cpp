@@ -194,7 +194,7 @@ public:
 	void update_st_array(int* arrptr)
 	{
 		arrptr[0] = (dist_left <= thresh) ? 1 : 0;
-		arrptr[1] = (dist_front <= thresh) ? 1 : 0;
+		arrptr[1] = (dist_front <= thresh/1.5) ? 1 : 0;
 		arrptr[2] = (dist_right <= thresh) ? 1 : 0;
 	}
 
@@ -218,7 +218,7 @@ public:
 			ROS_INFO("Moved %d times.", count);
 			count++;
 
-		} while (std::equal(std::begin(new_st), std::end(new_st), std::begin(curr_st)));
+		} while (std::equal(std::begin(new_st), std::end(new_st), std::begin(curr_st)) && !new_st[1]);
 	
 		std::copy(std::begin(new_st), std::end(new_st), std::begin(curr_st));
 	}
@@ -314,6 +314,7 @@ public:
 			opt = opt_stack.top();
 			opt_stack.pop();
 
+			ROS_INFO("CURRENT LOCATION: %f, %f",curr_x, curr_y );
 			ROS_INFO("GOAL LOCATION: %f, %f",opt.x, opt.y );
 
 			// Move to the previous node
