@@ -131,9 +131,9 @@ public:
 		auto msg = geometry_msgs::Twist();
 
 		// Calculate the direction
-		float difference = target - curr_yaw;
+		// float difference = target - curr_yaw;
 
-		int direction = abs(difference) < 180;
+		int direction = (target <= fmod((180+curr_yaw),360.)) ? 1 : -1;
 
 		ROS_INFO("Current yaw vs target: %f vs %f", curr_yaw, target);
 		while (abs(curr_yaw - target) > 5)
